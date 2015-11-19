@@ -242,16 +242,16 @@ make & enjoy!
 #endif
 
 /* Defaults - If your board can do better, set it here.  Set for the most common type inputs. */
-#define DEFAULT_V4L_WIDTH  800
-#define DEFAULT_V4L_HEIGHT 600
+#define DEFAULT_V4L_WIDTH  640
+#define DEFAULT_V4L_HEIGHT 480
 
 #define CHANNEL_NUMBER 1
 #define MAX_CAMERAS 8
 
 
 // default and maximum number of V4L buffers, not including last, 'special' buffer
-#define MAX_V4L_BUFFERS 1
-#define DEFAULT_V4L_BUFFERS 1
+#define MAX_V4L_BUFFERS 10
+#define DEFAULT_V4L_BUFFERS 4
 
 // if enabled, then bad JPEG warnings become errors and cause NULL returned instead of image
 #define V4L_ABORT_BADJPEG
