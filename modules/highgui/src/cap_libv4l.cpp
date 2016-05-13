@@ -341,6 +341,8 @@ static int icvGrabFrameCAM_V4L( CvCaptureCAM_V4L* capture );
 static IplImage* icvRetrieveFrameCAM_V4L( CvCaptureCAM_V4L* capture, int );
 CvCapture* cvCreateCameraCapture_V4L( int index );
 
+static int zeroPropertyQuietly(CvCaptureCAM_V4L* capture, int property_id, int value);
+
 static double icvGetPropertyCAM_V4L( CvCaptureCAM_V4L* capture, int property_id );
 static int    icvSetPropertyCAM_V4L( CvCaptureCAM_V4L* capture, int property_id, double value );
 
@@ -1287,6 +1289,29 @@ static IplImage* icvRetrieveFrameCAM_V4L( CvCaptureCAM_V4L* capture, int) {
     return 0;
 }
 
+static int zeroPropertyQuietly(CvCaptureCAM_V4L* capture, int property_id, int value)
+{
+  struct v4l2_control c;
+  int v4l2_min;
+  int v4l2_max;
+  //we need to make sure that the autocontrol is switch off, if available.
+  capture->control.id = property_id;
+  v4l2_min = v4l2_get_ctrl_min(capture, capture->control.id);
+  v4l2_max = v4l2_get_ctrl_max(capture, capture->control.id);
+  if ( !((v4l2_min == -1) && (v4l2_max == -1)) ) {
+    //autocontrol capability is supported, switch it off.
+    c.id    = capture->control.id;
+    c.value = value;
+    if( v4l2_ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &c) != 0 ){
+      if (errno != ERANGE) {
+        fprintf(stderr, "VIDEOIO ERROR: V4L2: Failed to set autocontrol \"%d\": %s (value %d)\n", c.id, strerror(errno), c.value);
+        return -1;
+      }
+    }
+  }//lack of support should not be considerred an error.
+  return 0;
+}
+
 /* TODO: review this adaptation */
 static double icvGetPropertyCAM_V4L (CvCaptureCAM_V4L* capture,
                                      int property_id ) {
@@ -1333,7 +1358,7 @@ static double icvGetPropertyCAM_V4L (CvCaptureCAM_V4L* capture,
       break;
     case CV_CAP_PROP_EXPOSURE:
       sprintf(name, "Exposure");
-      capture->control.id = V4L2_CID_EXPOSURE;
+      capture->control.id = V4L2_CID_EXPOSURE_ABSOLUTE;
       break;
     default:
       sprintf(name, "<unknown property string>");
@@ -1344,14 +1369,8 @@ static double icvGetPropertyCAM_V4L (CvCaptureCAM_V4L* capture,
     /* all went well */
     is_v4l2_device = 1;
   } else {
-   if (capture->control.id==V4L2_CID_EXPOSURE){
-    is_v4l2_device = 1;
-    capture->control.id = V4L2_CID_EXPOSURE_ABSOLUTE;
-    
-  } else{
     fprintf(stderr, "HIGHGUI ERROR: V4L2: Unable to get property %s(%u) - %s\n", name, capture->control.id, strerror(errno));
   }
-}
 
   if (is_v4l2_device == 1) {
       /* get the min/max values */
@@ -1535,8 +1554,11 @@ static int icvSetControl (CvCaptureCAM_V4L* capture, int property_id, double val
       capture->control.id = V4L2_CID_GAIN;
       break;
     case CV_CAP_PROP_EXPOSURE:
+      //we need to make sure that the autoexposure is switch off, if available.
+      zeroPropertyQuietly(capture, V4L2_CID_EXPOSURE_AUTO, V4L2_EXPOSURE_MANUAL);
+      //now get the manual exposure value
       sprintf(name, "Exposure");
-      capture->control.id = V4L2_CID_EXPOSURE;
+      capture->control.id = V4L2_CID_EXPOSURE_ABSOLUTE;
       break;
     default:
       sprintf(name, "<unknown property string>");
@@ -1547,16 +1569,8 @@ static int icvSetControl (CvCaptureCAM_V4L* capture, int property_id, double val
   v4l2_max = v4l2_get_ctrl_max(capture, capture->control.id);
 
   if ((v4l2_min == -1) && (v4l2_max == -1)) {
-    if (capture->control.id==V4L2_CID_EXPOSURE){
-      sprintf(name, "Exposure");
-      capture->control.id = V4L2_CID_EXPOSURE_ABSOLUTE;
-      v4l2_min = v4l2_get_ctrl_min(capture, capture->control.id);
-      v4l2_max = v4l2_get_ctrl_max(capture, capture->control.id);
-    } else{
-      fprintf(stderr, "HIGHGUI ERROR: V4L: Property %s(%u) not supported by device\n", name, property_id);
+    fprintf(stderr, "HIGHGUI ERROR: V4L: Property %s(%u) not supported by device\n", name, property_id);
     return -1;
-    }
-    
   }
 
   if(v4l2_ioctl(capture->deviceHandle, VIDIOC_G_CTRL, &capture->control) == 0) {
@@ -1580,25 +1594,9 @@ static int icvSetControl (CvCaptureCAM_V4L* capture, int property_id, double val
   /* try and set value as if it was a v4l2 device */
   c.id    = capture->control.id;
   c.value = ctrl_value;
-
-  if((capture->control.id==V4L2_CID_EXPOSURE_ABSOLUTE)&&(c.value<=1)){
-    c.id=V4L2_CID_EXPOSURE_AUTO;
-    c.value=3;
-    v4l2_ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &c);
-    return 0;
-  }
-
   if (v4l2_ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &c) != 0) {
     /* The driver may clamp the value or return ERANGE, ignored here */
-    if((capture->control.id==V4L2_CID_EXPOSURE_ABSOLUTE)){
-      c.id=V4L2_CID_EXPOSURE_AUTO;
-      c.value=1;
-      v4l2_ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &c);
-      c.id=V4L2_CID_EXPOSURE_ABSOLUTE;
-      c.value=ctrl_value;
-      v4l2_ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &c);
-    }
-    else if (errno != ERANGE) {
+    if (errno != ERANGE) {
       fprintf(stderr, "HIGHGUI ERROR: V4L2: Failed to set control \"%d\": %s (value %d)\n", c.id, strerror(errno), c.value);
       is_v4l2 = 0;
     } else {
@@ -1682,9 +1680,9 @@ static int icvSetPropertyCAM_V4L(CvCaptureCAM_V4L* capture, int property_id, dou
         memset (&setfps, 0, sizeof(struct v4l2_streamparm));
         setfps.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         setfps.parm.capture.timeperframe.numerator = 1;
-        
+
         setfps.parm.capture.timeperframe.denominator = value;
-    
+
         capture->type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         // Stop the stream
         if (xioctl(capture->deviceHandle, VIDIOC_STREAMOFF, &capture->type) < 0) {
@@ -1778,7 +1776,7 @@ static void queue_buff(CvCaptureCAM_V4L* capture){
     if (-1 == xioctl (capture->deviceHandle, VIDIOC_QBUF, &buf)){
       perror ("VIDIOC_QBUF");
     }
-  
+
   }
 }
 
