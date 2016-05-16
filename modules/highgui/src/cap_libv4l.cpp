@@ -1304,7 +1304,7 @@ static int zeroPropertyQuietly(CvCaptureCAM_V4L* capture, int property_id, int v
     c.value = value;
     if( v4l2_ioctl(capture->deviceHandle, VIDIOC_S_CTRL, &c) != 0 ){
       if (errno != ERANGE) {
-        fprintf(stderr, "VIDEOIO ERROR: V4L2: Failed to set autocontrol \"%d\": %s (value %d)\n", c.id, strerror(errno), c.value);
+        fprintf(stderr, "HIGHGUI ERROR: V4L2: Failed to set autocontrol \"%d\": %s (value %d)\n", c.id, strerror(errno), c.value);
         return -1;
       }
     }
@@ -1554,9 +1554,6 @@ static int icvSetControl (CvCaptureCAM_V4L* capture, int property_id, double val
       capture->control.id = V4L2_CID_GAIN;
       break;
     case CV_CAP_PROP_EXPOSURE:
-      //we need to make sure that the autoexposure is switch off, if available.
-      zeroPropertyQuietly(capture, V4L2_CID_EXPOSURE_AUTO, V4L2_EXPOSURE_MANUAL);
-      //now get the manual exposure value
       sprintf(name, "Exposure");
       capture->control.id = V4L2_CID_EXPOSURE_ABSOLUTE;
       break;
@@ -1598,7 +1595,8 @@ static int icvSetControl (CvCaptureCAM_V4L* capture, int property_id, double val
     /* The driver may clamp the value or return ERANGE, ignored here */
     if (errno != ERANGE) {
       fprintf(stderr, "HIGHGUI ERROR: V4L2: Failed to set control \"%d\": %s (value %d)\n", c.id, strerror(errno), c.value);
-      is_v4l2 = 0;
+      // is_v4l2 = 0;
+      return -1;
     } else {
       return 0;
     }
@@ -1861,6 +1859,10 @@ bool CvCaptureCAM_V4L_CPP::open( int index )
     numCameras = 0;
     indexList = 0;
     captureV4L = icvCaptureFromCAM_V4L(index);
+    if (captureV4L) {
+        //we need to make sure that the autoexposure is switch off, if available.
+        zeroPropertyQuietly(captureV4L, V4L2_CID_EXPOSURE_AUTO, V4L2_EXPOSURE_MANUAL);
+    }
     return captureV4L != 0;
 }
 
