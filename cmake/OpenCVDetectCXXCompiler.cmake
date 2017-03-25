@@ -14,10 +14,6 @@ if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
   set(CMAKE_COMPILER_IS_CLANGCC 1)
 endif()
 
-if((CMAKE_COMPILER_IS_CLANGCXX OR CMAKE_COMPILER_IS_CLANGCC) AND NOT CMAKE_GENERATOR MATCHES "Xcode")
-  set(ENABLE_PRECOMPILED_HEADERS OFF CACHE BOOL "" FORCE)
-endif()
-
 # ----------------------------------------------------------------------------
 # Detect Intel ICC compiler -- for -fPIC in 3rdparty ( UNIX ONLY ):
 #  see  include/opencv/cxtypes.h file for related   ICC & CV_ICC defines.
@@ -42,7 +38,7 @@ if(UNIX)
   endif()
 endif()
 
-if(MSVC AND CMAKE_C_COMPILER MATCHES "icc")
+if(MSVC AND CMAKE_C_COMPILER MATCHES "icc|icl")
   set(CV_ICC   __INTEL_COMPILER_FOR_WINDOWS)
 endif()
 
@@ -91,9 +87,9 @@ elseif(CMAKE_COMPILER_IS_GNUCXX)
 
   if(WIN32)
     execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpmachine
-              OUTPUT_VARIABLE CMAKE_OPENCV_GCC_TARGET_MACHINE
+              OUTPUT_VARIABLE OPENCV_GCC_TARGET_MACHINE
               OUTPUT_STRIP_TRAILING_WHITESPACE)
-    if(CMAKE_OPENCV_GCC_TARGET_MACHINE MATCHES "amd64|x86_64|AMD64")
+    if(OPENCV_GCC_TARGET_MACHINE MATCHES "amd64|x86_64|AMD64")
       set(MINGW64 1)
     endif()
   endif()
@@ -109,10 +105,12 @@ elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "i686.*|i386.*|x86.*|amd64.*|AMD64.*")
   set(X86 1)
 elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "arm.*|ARM.*")
   set(ARM 1)
+elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64.*|AARCH64.*")
+  set(AARCH64 1)
 endif()
 
 
-# Similar code is existed in OpenCVConfig.cmake
+# Similar code exists in OpenCVConfig.cmake
 if(NOT DEFINED OpenCV_STATIC)
   # look for global setting
   if(NOT DEFINED BUILD_SHARED_LIBS OR BUILD_SHARED_LIBS)
@@ -138,15 +136,15 @@ if(MSVC)
     set(OpenCV_RUNTIME vc11)
   elseif(MSVC_VERSION EQUAL 1800)
     set(OpenCV_RUNTIME vc12)
+  elseif(MSVC_VERSION EQUAL 1900)
+    set(OpenCV_RUNTIME vc14)
+  elseif(MSVC_VERSION EQUAL 1910)
+    set(OpenCV_RUNTIME vc15)
   endif()
 elseif(MINGW)
   set(OpenCV_RUNTIME mingw)
 
-  execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpmachine
-                  OUTPUT_VARIABLE OPENCV_GCC_TARGET_MACHINE
-                  OUTPUT_STRIP_TRAILING_WHITESPACE)
-  if(CMAKE_OPENCV_GCC_TARGET_MACHINE MATCHES "64")
-    set(MINGW64 1)
+  if(MINGW64)
     set(OpenCV_ARCH x64)
   else()
     set(OpenCV_ARCH x86)

@@ -54,6 +54,12 @@
 #include "opencv2/objdetect/objdetect.hpp"
 #include "opencv2/features2d/features2d.hpp"
 
+// std::auto_ptr
+#if defined(__GNUC__) && __GNUC__ >= 6
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+
 namespace cv { namespace gpu {
 
 //////////////////////////////// CudaMem ////////////////////////////////
@@ -537,7 +543,7 @@ CV_EXPORTS void log(const GpuMat& a, GpuMat& b, Stream& stream = Stream::Null())
 //! supports all, except depth == CV_64F
 CV_EXPORTS void pow(const GpuMat& src, double power, GpuMat& dst, Stream& stream = Stream::Null());
 
-//! compares elements of two arrays (c = a <cmpop> b)
+//! compares elements of two arrays (c = a \<cmpop\> b)
 CV_EXPORTS void compare(const GpuMat& a, const GpuMat& b, GpuMat& c, int cmpop, Stream& stream = Stream::Null());
 CV_EXPORTS void compare(const GpuMat& a, Scalar sc, GpuMat& c, int cmpop, Stream& stream = Stream::Null());
 
@@ -2264,6 +2270,7 @@ public:
      * model.
      * @param frame        Input frame
      * @param fgmask       Output mask image representing foreground and background pixels
+     * @param learningRate determines how quickly features are “forgotten” from histograms
      * @param stream       Stream for the asynchronous version
      */
     void operator ()(const GpuMat& frame, GpuMat& fgmask, float learningRate = -1.0f, Stream& stream = Stream::Null());
@@ -2525,5 +2532,9 @@ CV_EXPORTS void calcWobbleSuppressionMaps(
 } // namespace gpu
 
 } // namespace cv
+
+#if defined(__GNUC__) && __GNUC__ >= 6
+#pragma GCC diagnostic pop
+#endif
 
 #endif /* __OPENCV_GPU_HPP__ */
