@@ -1,5 +1,9 @@
 ### OpenCV: Open Source Computer Vision Library
 
+Special Horus version from [LibreScanner](https://github.com/LibreScanner/opencv) but with an updated version of OpenCV 2.4.13.2.
+
+Updated for the Ciclop at ToulonuX.
+
 #### Resources
 
 * Homepage: <http://opencv.org>
